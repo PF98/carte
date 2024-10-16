@@ -55,11 +55,14 @@ class ScalaReale(
 
         yield ["turn_status", self._playing_status]
 
-        if ws_player and self._players.index(ws_player) == self._current_player_id:
-            if self._playing_status is ScalaRealePlayingStatus.HAND:
-                if self._table_drawn_card is not None:
-                    yield ["discard_prevention", self._table_drawn_card]
-            yield ["turn"]
+        if self._game_status is GameStatus.ENDED:
+            yield from self._show_winner_cards()
+        else:
+            if ws_player and self._players.index(ws_player) == self._current_player_id:
+                if self._playing_status is ScalaRealePlayingStatus.HAND:
+                    if self._table_drawn_card is not None:
+                        yield ["discard_prevention", self._table_drawn_card]
+                yield ["turn"]
 
     async def _start_game(self) -> None:
         await self._send("init_deck", len(self._deck), self._deck[-1].back)
@@ -72,7 +75,10 @@ class ScalaReale(
         await self._draw_to_table()
 
     def _results(self) -> Iterator[list[Any]]:
-        yield [1 if player is self.current_player else 0 for player in self._players]
+        results = [
+            1 if player is self.current_player else 0 for player in self._players
+        ]
+        yield ["results", *results]
 
     def _append_to_table(self, card: Card) -> None:
         self._table.append(card)
@@ -144,13 +150,21 @@ class ScalaReale(
             msg = "You don't have that card"
             raise CmdError(msg) from e
 
-        self._table_drawn_card = None
-
         self._append_to_table(card)
+
+        self._table_drawn_card = None
 
         if self._check_win():
             self._playing_status = ScalaRealePlayingStatus.WIN
+            await self._send("turn_status", self._playing_status)
+
+            for args in self._show_winner_cards():
+                await self._send(*args)
+
+            await self._send("play_card", self._current_player_id, card)
+
             await self._end_game()
+            return
 
         await self._send("play_card", self._current_player_id, card)
 
@@ -162,6 +176,22 @@ class ScalaReale(
 
         await self._send("turn_status", self._playing_status)
         await self._send(self.current_player, "turn")
+
+    def _show_winner_cards(self) -> Iterator[list[Any]]:
+        hand = self.current_player.hand
+        jokers = [card for card in hand if card.number is CardNumber.JOKER]
+        card_numbers = [card.number for card in hand]
+
+        cards = []
+
+        for number in CardNumber.get_french():
+            try:
+                i = card_numbers.index(number)
+                cards.append(hand[i])
+            except ValueError:
+                cards.append(jokers.pop(0))
+
+        yield ["show_winner_cards", self._current_player_id, *cards]
 
     def _check_win(self) -> bool:
         hand = [

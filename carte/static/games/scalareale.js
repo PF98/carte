@@ -13,6 +13,7 @@ class ScalaReale extends FrenchBaseGame {
     return [
       ["hand", ["player"], this.handSize],
       ["playing-area", [], 2],
+      ["winner-cards", [], 13],
     ];
   }
 
@@ -168,28 +169,42 @@ class ScalaReale extends FrenchBaseGame {
     }
   }
 
-  cmdResultsPrepare() {
-    const table = document.getElementById("results-table");
+  async cmdShowWinnerCards(playerId, ...cardStrs) {
+    const isAnimation = !("noAnimations" in this.gameArea.dataset);
 
-    for (const [playerId, playerName] of this.players.entries()) {
-      const row = table.insertRow();
+    const player = this.getPlayerIdentifier(playerId);
+    const cardField = this.cardFields.get("hand").select("player", player);
+    const dest = this.cardFields.get("winner-cards");
+
+    const funcs = [];
+    for (const cardStr of cardStrs) {
+      const card = Card.fromString(cardStr);
+
+      const selectParams = new Map();
+      const newParams = new Map();
       if (this.isPlayerSelf(playerId)) {
-        row.classList.add("self");
+        card.setParamsMap(selectParams);
+      } else {
+        if (card.back !== undefined) {
+          selectParams.set("back", card.back);
+        }
+        card.setParamsMap(newParams);
       }
-      const playerCell = row.insertCell();
-      playerCell.textContent = playerName;
+      newParams.set("fieldPlayer", player);
 
-      const pointsCell = row.insertCell();
-      pointsCell.classList.add("points");
+      const func = cardField.moveTo(selectParams, dest, newParams, 1);
+      funcs.push(func);
 
-      // details cell, with 5 divs inside for carte/denari/primiera/settebello/scope
-      const detailsCell = row.insertCell();
-      detailsCell.classList.add("details");
-      for (let i = 0; i < 5; i++) {
-        const div = document.createElement("div");
-        detailsCell.append(div);
+      if (isAnimation) {
+        await this.sleep(this.transitionDuration / 4);
       }
     }
+
+    await this.awaitCardTransitions(() => {
+      for (const func of funcs) {
+        func();
+      }
+    });
   }
 }
 

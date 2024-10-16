@@ -9,19 +9,28 @@
     display: block;
   }
 
+  --card-overlap-fraction: 0.5;
   div {
     /* WIDE LANDSCAPE: the hand/playing-area cards are centered around the
      * center of the screen; it's wide enough to have 7-wrapped playing area
      * (so at most 2 rows) and the vertical size of the cards can be increased) */
     --unit: min(
-      calc(100dvw / (var(--card-width-raw) * 14 + var(--gap-raw) * 15)),
+      calc(
+        100dvw /
+        (
+          var(--card-width-raw) *
+          ((1 - var(--card-overlap-fraction)) * 13 + 1) +
+          var(--gap-raw) *
+          2
+        )
+      ),
       calc(
         100dvh /
         (
           var(--card-height-raw) *
           4 +
           var(--gap-raw) *
-          3 +
+          5 +
           var(--deck-shadow-max-width-raw) *
           1
         )
@@ -29,44 +38,34 @@
     );
 
     --center-x: calc(50dvw - var(--card-width) / 2);
-    --playing-area-wrap: 7;
 
-    /* PORTRAIT OR SQUARISH ASPECT RATIO: the cards are centered around the
-     * "leftover" space from the points decks and the playing area wraps with
-     * a width of 6 (like the hands) */
-    /*    @media (aspect-ratio < 1.5) {
+    /* PORTRAIT OR SQUARISH ASPECT RATIO: the cards are centered */
+    @media (aspect-ratio < 1.5) {
       --unit: min(
         calc(
           100dvw /
           (
-            var(--card-height-raw) +
             var(--card-width-raw) *
-            6 +
+            (var(--card-overlap-fraction) * 13 + 1) +
             var(--gap-raw) *
-            8 +
-            var(--deck-shadow-max-width-raw)
+            2
           )
         ),
         calc(
           100dvh /
           (
             var(--card-height-raw) *
-            5 +
-            var(--gap-raw) *
             4 +
+            var(--gap-raw) *
+            5 +
             var(--deck-shadow-max-width-raw) *
-            2
+            1
           )
         )
       );
 
-      --center-x: calc(
-        50dvw +
-        (var(--left) + var(--card-height) - var(--card-width)) /
-        2
-      );
-      --playing-area-wrap: 6;
-    }*/
+      --center-x: calc(50dvw - var(--card-width) / 2);
+    }
 
     --card-starting-y: var(--center-y);
     --card-starting-x: var(--left);
@@ -98,60 +97,33 @@
       }
 
       &[data-position="hand"] {
-        --active-card-offset: 0;
         left: calc(
           var(--center-x) +
           (var(--card-field-position) - (var(--card-field-size) - 1) / 2) *
-          (var(--gap) + var(--card-width))
-        );
-        &[data-player="opponent"] {
-          top: calc(var(--top) + var(--active-card-offset) * var(--card-height));
-        }
-        &[data-player="self"] {
-          top: calc(var(--bottom) - var(--active-card-offset) * var(--card-height));
-        }
-      }
-
-      &[data-position="points"] {
-        --card-rotation: 1;
-        --deck-writing-mode: vertical-rl;
-        /* z-index of 18 to be above of all the scopa-points card (at most 18) */
-        z-index: 18;
-        left: calc(var(--left) + var(--rotation-diff));
-        &[data-player="opponent"] {
-          top: calc(var(--top) - var(--rotation-diff));
-        }
-        &[data-player="self"] {
-          top: calc(var(--bottom) - var(--deck-shadow-width) + var(--rotation-diff));
-        }
-      }
-
-      &[data-position="points-scopa"] {
-        --num-offset: calc(
-          2 *
-          var(--card-field-position) /
-          (var(--card-field-size) - 1) -
-          1
-        );
-        &[data-field-size="1"] {
-          --num-offset: 0;
-        }
-        left: calc(
-          /* base distance from the left: center */
-          var(--left) +
-          var(--deck-shadow-width) +
-          var(--rotation-diff) +
-          /* card based count */
-          (var(--rotation-diff) - var(--card-radius) / 2) *
-          var(--num-offset)
+          (var(--card-width) * (1 - var(--card-overlap-fraction)))
         );
         z-index: var(--card-field-position);
         &[data-player="opponent"] {
-          top: calc(var(--top) + var(--deck-shadow-width));
-          --card-rotation: 2; /* upside down */
+          top: var(--top);
         }
         &[data-player="self"] {
-          top: calc(var(--bottom) - var(--deck-shadow-width));
+          top: var(--bottom);
+        }
+      }
+
+      &[data-position="winner-cards"] {
+        --field-size: 13;
+        left: calc(
+          var(--center-x) +
+          (var(--card-field-position) - (var(--field-size) - 1) / 2) *
+          (var(--card-width) * (1 - var(--card-overlap-fraction)))
+        );
+        z-index: var(--card-field-position);
+        &[data-field-player="opponent"] {
+          top: calc((var(--top) + var(--center-y)) / 2);
+        }
+        &[data-field-player="self"] {
+          top: calc((var(--bottom) + var(--center-y)) / 2);
         }
       }
     }
