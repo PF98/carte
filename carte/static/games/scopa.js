@@ -1,6 +1,6 @@
-import { BaseGame } from "./base.js";
+import { Card, ItalianBaseGame } from "./base.js";
 
-class Scopa extends BaseGame {
+class Scopa extends ItalianBaseGame {
   get playerIdentifiers() {
     return ["opponent", "self"];
   }
@@ -92,17 +92,11 @@ class Scopa extends BaseGame {
     await this.awaitCardTransitions();
   }
 
-  async cmdAddToTable(card) {
-    const [suit, number] = card.split(":");
+  async cmdAddToTable(cardStr) {
+    const card = Card.fromString(cardStr);
 
     const deck = this.decks.get("deck");
-    const func = deck.moveTo(
-      this.cardFields.get("playing-area"),
-      new Map([
-        ["suit", suit],
-        ["number", number],
-      ]),
-    );
+    const func = deck.moveTo(this.cardFields.get("playing-area"), card.setParamsMap());
     await this.awaitCardTransitions(func);
   }
 
@@ -110,27 +104,20 @@ class Scopa extends BaseGame {
     this.gameArea.dataset.playingStatus = status;
   }
 
-  cmdActivateCard(playerId, activeCard) {
-    const [suit, number] = activeCard.split(":");
+  cmdActivateCard(playerId, activeCardStr) {
+    const activeCard = Card.fromString(activeCardStr);
     const player = this.getPlayerIdentifier(playerId);
 
     const params = new Map();
     if (this.isPlayerSelf(playerId)) {
-      params.set("suit", suit);
-      params.set("number", number);
+      activeCard.setParamsMap(params);
     }
 
     const cardField = this.cardFields.get("hand").select("player", player);
     const [cardObj] = cardField.getCards(params, 1);
 
-    this.addCardParams(
-      cardObj,
-      new Map([
-        ["suit", suit],
-        ["number", number],
-        ["active", ""],
-      ]),
-    );
+    const activeParams = new Map([["active", ""]]);
+    this.addCardParams(cardObj, activeCard.setParamsMap(activeParams));
 
     // no animation: to increase the fluidity, the card to be taken may be
     // clicked just after activating this one
@@ -138,15 +125,9 @@ class Scopa extends BaseGame {
 
   cmdCaptureTakeableCards(...cards) {
     const cardField = this.cardFields.get("playing-area");
-    for (const card of cards) {
-      const [suit, number] = card.split(":");
-      const [cardObj] = cardField.getCards(
-        new Map([
-          ["suit", suit],
-          ["number", number],
-        ]),
-        1,
-      );
+    for (const cardStr of cards) {
+      const card = Card.fromString(cardStr);
+      const [cardObj] = cardField.getCards(card.setParamsMap(), 1);
 
       this.toggleCardParam(cardObj, "takeable");
     }
@@ -156,15 +137,9 @@ class Scopa extends BaseGame {
 
   cmdCaptureSelectedCards(...cards) {
     const cardField = this.cardFields.get("playing-area");
-    for (const card of cards) {
-      const [suit, number] = card.split(":");
-      const [cardObj] = cardField.getCards(
-        new Map([
-          ["suit", suit],
-          ["number", number],
-        ]),
-        1,
-      );
+    for (const cardStr of cards) {
+      const card = Card.fromString(cardStr);
+      const [cardObj] = cardField.getCards(card.setParamsMap(), 1);
 
       this.toggleCardParam(cardObj, "selected");
     }
@@ -218,15 +193,9 @@ class Scopa extends BaseGame {
     const cardField = this.cardFields.get("points-scopa").select("player", player);
 
     const funcs = [];
-    for (const card of cards) {
-      const [suit, number] = card.split(":");
-      const func = deck.moveTo(
-        cardField,
-        new Map([
-          ["suit", suit],
-          ["number", number],
-        ]),
-      );
+    for (const cardStr of cards) {
+      const card = Card.fromString(cardStr);
+      const func = deck.moveTo(cardField, card.setParamsMap());
       funcs.push(func);
     }
     await this.awaitCardTransitions(() => {

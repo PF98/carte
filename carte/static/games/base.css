@@ -3,12 +3,34 @@
   inset: 0;
   overflow: hidden;
 
-  &[data-card-type="piacentine"] div {
-    --card-width-inner: 0.51;
-    --card-height-inner: 0.91;
-    --card-radius: calc(0.06 * var(--unit));
-    --card-image: url("../piacentine.webp");
-    --card-image-back: url("../piacentine-back.webp");
+  &[data-card-family="italiane"] {
+    div {
+      --card-family-suits: 4;
+      --card-family-numbers: 10;
+      --card-family-backs: 1;
+    }
+    &[data-card-type="piacentine"] div {
+      --card-width-inner: 0.51;
+      --card-height-inner: 0.91;
+      --card-radius: calc(0.06 * var(--unit));
+      --card-image: url("../piacentine.webp");
+      --card-image-back: url("../piacentine-back.webp");
+    }
+  }
+
+  &[data-card-family="francesi"] {
+    div {
+      --card-family-suits: 4;
+      --card-family-numbers: 14;
+      --card-family-backs: 2;
+    }
+    &[data-card-type="piacentine"] div {
+      --card-width-inner: 0.6;
+      --card-height-inner: 0.91;
+      --card-radius: calc(0.05 * var(--unit));
+      --card-image: url("../francesi.jpg");
+      --card-image-back: url("../francesi-back.jpg");
+    }
   }
 
   div {
@@ -46,6 +68,8 @@
     --card-bg-x: -1;
     --card-bg-y: -1;
 
+    --card-bk-x: -1;
+
     --card-rotation: 0;
 
     &.card {
@@ -55,7 +79,8 @@
       border-radius: var(--card-radius);
       background-image: var(--card-image);
       background-position: calc(var(--card-bg-x) * -100%) calc(var(--card-bg-y) * -100%);
-      background-size: 1000% 400%;
+      background-size: calc(var(--card-family-numbers) * 100%)
+        calc(var(--card-family-suits) * 100%);
       position: absolute;
       transition-property: top, left, rotate;
       transition-duration: 0.5s;
@@ -80,7 +105,8 @@
 
       &:not([data-suit][data-number]) {
         background-image: var(--card-image-back);
-        background-size: 100% 100%;
+        background-position: calc(var(--card-bk-x) * -100%) 0%;
+        background-size: calc(var(--card-family-backs) * 100%) 100%;
       }
 
       &[data-deck] {

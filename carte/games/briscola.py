@@ -4,10 +4,16 @@ from collections.abc import Iterator
 
 from carte.exc import CmdError
 from carte.games.base import BaseGame, Player, cmd
-from carte.types import Card, CardNumber, GameStatus, Sendable
+from carte.types import Card, CardFamily, CardNumber, GameStatus, Sendable
 
 
-class Briscola(BaseGame[Player], version=1, number_of_players=2, hand_size=3):
+class Briscola(
+    BaseGame[Player],
+    version=1,
+    card_family=CardFamily.ITALIANE,
+    number_of_players=2,
+    hand_size=3,
+):
     def __init__(self, game_id: str) -> None:
         super().__init__(game_id)
 

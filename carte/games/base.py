@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import itertools
 import random
 import types
 from collections.abc import Callable, Iterable, Iterator
@@ -22,7 +21,17 @@ import aiohttp
 from aiohttp import web
 
 from carte.exc import CmdError
-from carte.types import Card, CardNumber, CmdFunc, Command, GameStatus, Sendable, Suit
+from carte.types import (
+    Card,
+    CardBack,
+    CardFamily,
+    CardNumber,
+    CmdFunc,
+    Command,
+    GameStatus,
+    Sendable,
+    Suit,
+)
 
 
 def cmd(
@@ -75,6 +84,7 @@ class BaseGame(Generic[T_Player]):
     player_class: type[T_Player]
     version: int
     game_name: str
+    card_family: CardFamily
     number_of_players: int
     hand_size: int
 
@@ -94,6 +104,7 @@ class BaseGame(Generic[T_Player]):
         *,
         version: int,
         game_name: str | None = None,
+        card_family: CardFamily,
         number_of_players: int,
         hand_size: int,
         **kwargs: Any,
@@ -108,6 +119,7 @@ class BaseGame(Generic[T_Player]):
         )[0]
         cls.version = version
         cls.game_name = game_name or cls.__name__
+        cls.card_family = card_family
         cls.number_of_players = number_of_players
         cls.hand_size = hand_size
         cls.GAMES[cls.__name__.lower()] = cls
@@ -125,10 +137,16 @@ class BaseGame(Generic[T_Player]):
         self._send_lock = asyncio.Lock()
         self.__dict__.update(state)
 
+    def _get_deck(self) -> list[Card]:
+        if self.card_family is CardFamily.ITALIANE:
+            cards = Card.get_italian_deck()
+        elif self.card_family is CardFamily.FRANCESI:
+            # french cards: two decks
+            cards = Card.get_french_deck(2, has_joker=True)
+        return cards
+
     def _shuffle_deck(self) -> list[Card]:
-        cards = [
-            Card(suit, number) for suit, number in itertools.product(Suit, CardNumber)  # type: ignore[arg-type]
-        ]
+        cards = self._get_deck()
         random.shuffle(cards)
         return cards
 
@@ -262,8 +280,25 @@ class BaseGame(Generic[T_Player]):
         player.hand.append(card)
         player_id = self._players.index(player)
         async with asyncio.TaskGroup() as tg:
-            tg.create_task(self._send(player, "draw_card", player_id, card))
-            tg.create_task(self._send_others(player, "draw_card", player_id))
+            if card.back is CardBack.NONE:
+                tg.create_task(self._send(player, "draw_card", player_id, card))
+                tg.create_task(self._send_others(player, "draw_card", player_id))
+            else:
+                if self._deck:
+                    back = self._deck[-1].back
+                    tg.create_task(
+                        self._send(player, "draw_card", player_id, card, back)
+                    )
+                    tg.create_task(
+                        self._send_others(
+                            player, "draw_card", player_id, card.back, back
+                        )
+                    )
+                else:
+                    tg.create_task(self._send(player, "draw_card", player_id, card))
+                    tg.create_task(
+                        self._send_others(player, "draw_card", player_id, card.back)
+                    )
 
     def _next_player(self) -> None:
         self._current_player_id = (self._current_player_id + 1) % self.number_of_players
@@ -315,8 +350,15 @@ class BaseGame(Generic[T_Player]):
             elif type_ is Card:
                 card = next(raw_args)
                 try:
-                    suit, number = card.split(":")
-                    args.append(Card(Suit(suit), CardNumber(number)))
+                    data = card.split(":")
+                    if len(data) == 2:
+                        suit, number = data
+                        args.append(Card(Suit(suit), CardNumber(number)))
+                    else:
+                        back, suit, number = data
+                        args.append(
+                            Card(Suit(suit), CardNumber(number), CardBack(back))
+                        )
                 except ValueError as e:
                     err = f"Invalid card: {card}"
                     raise CmdError(err) from e

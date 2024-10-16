@@ -113,8 +113,12 @@ class Deck extends CardGroup {
     this.game.createCard(deckParams);
   }
 
+  getCard() {
+    return this.game.gameArea.querySelector(this.getSelector());
+  }
+
   get count() {
-    const deck = this.game.gameArea.querySelector(this.getSelector());
+    const deck = this.getCard();
     return Number.parseInt(deck.dataset.deckCount);
   }
 
@@ -123,8 +127,12 @@ class Deck extends CardGroup {
   }
 
   setCount(value) {
-    const deck = this.game.gameArea.querySelector(this.getSelector());
+    const deck = this.getCard();
     deck.dataset.deckCount = this.capped ? Math.min(this.capped, value) : value;
+  }
+
+  setBack(back) {
+    this.getCard().dataset.back = back;
   }
 }
 
@@ -163,6 +171,10 @@ class CardField extends CardGroup {
     };
   }
 
+  get count() {
+    return this.game.gameArea.querySelectorAll(this.getSelector()).length;
+  }
+
   receiveCard(card, cardParams) {
     card.dataset.position = this.name;
     this.game.addCardParams(card, new Map([...cardParams, ...this.params]));
@@ -175,13 +187,13 @@ class CardField extends CardGroup {
     const cardSel = Array.from(params)
       .map(([k, v]) => `[data-${k}='${v}']`)
       .join("");
-    return Array.from(
-      this.game.gameArea.querySelectorAll(this.getSelector() + cardSel),
-    ).slice(0, count);
+    const sortedCards = this.getSortedCards(this.getSelector() + cardSel);
+    return sortedCards.slice(0, count);
   }
 
-  refreshField() {
-    const cards = Array.from(this.game.gameArea.querySelectorAll(this.getSelector()));
+  getSortedCards(selector) {
+    const cards = Array.from(this.game.gameArea.querySelectorAll(selector));
+
     // sort: keep the data-field-position order, with the undefined ones at the end (in appearance order)
     cards.sort((c1, c2) => {
       if (!("fieldPosition" in c1.dataset)) {
@@ -200,10 +212,65 @@ class CardField extends CardGroup {
       );
     });
 
+    return cards;
+  }
+
+  refreshField() {
+    const cards = this.getSortedCards(this.getSelector());
     for (const [i, card] of cards.entries()) {
       card.dataset.fieldPosition = i;
       card.dataset.fieldSize = cards.length;
     }
+  }
+}
+
+// from string to card object
+class Card {
+  static FIELDS = ["suit", "number", "back"];
+  constructor() {
+    this.back;
+    this.suit;
+    this.number;
+  }
+
+  setParamsMap(params = new Map()) {
+    for (const v of Card.FIELDS) {
+      if (this[v] !== undefined) {
+        params.set(v, this[v]);
+      }
+    }
+    return params;
+  }
+
+  toString() {
+    if (this.suit === undefined && this.number === undefined) {
+      return `${this.back}`;
+    }
+    if (this.back === undefined) {
+      return `${this.suit}:${this.number}`;
+    }
+    return `${this.back}:${this.suit}:${this.number}`;
+  }
+
+  static fromString(cardStr) {
+    const card = new Card();
+    const data = cardStr.split(":");
+    if (data.length === 1) {
+      card.back = data[0];
+    } else {
+      [card.suit, card.number, card.back] = data;
+    }
+    return card;
+  }
+
+  static fromObj(cardObj) {
+    const card = new Card();
+    for (const v of Card.FIELDS) {
+      if (v in cardObj.dataset) {
+        card[v] = cardObj.dataset[v];
+      }
+    }
+    return card;
   }
 }
 
@@ -282,17 +349,6 @@ class BaseGame {
 
   get styleRules() {
     const rules = [];
-
-    rules.push(
-      ...["bastoni", "coppe", "denari", "spade"].map(
-        (suit, i) => `&[data-suit='${suit}'] {--card-bg-y: ${i}}`,
-      ),
-    );
-    rules.push(
-      ...["1", "2", "3", "4", "5", "6", "7", "fante", "cavallo", "re"].map(
-        (number, i) => `&[data-number='${number}'] {--card-bg-x: ${i}}`,
-      ),
-    );
 
     const cardFieldSize = Math.max(
       ...Array.from(this.cardFields.values()).map((cf) => cf.maxSize),
@@ -647,13 +703,12 @@ class BaseGame {
     this.gameArea.dataset.playing = "";
   }
 
-  async cmdDrawCard(playerId, card = null) {
+  async cmdDrawCard(playerId, cardStr = null, deckBack = null) {
     const player = this.getPlayerIdentifier(playerId);
     const params = new Map();
-    if (card !== null) {
-      const [suit, number] = card.split(":");
-      params.set("suit", suit);
-      params.set("number", number);
+    if (cardStr !== null) {
+      const card = Card.fromString(cardStr);
+      card.setParamsMap(params);
     }
 
     const deck = this.decks.get("deck");
@@ -662,21 +717,26 @@ class BaseGame {
       params,
     );
 
+    if (deckBack !== null) {
+      deck.getCard().dataset.back = deckBack;
+    }
+
     await this.awaitCardTransitions(func);
   }
 
-  async cmdPlayCard(playerId, card) {
-    const [suit, number] = card.split(":");
+  async cmdPlayCard(playerId, cardStr) {
+    const card = Card.fromString(cardStr);
     const player = this.getPlayerIdentifier(playerId);
 
     const selectParams = new Map();
     const newParams = new Map();
     if (this.isPlayerSelf(playerId)) {
-      selectParams.set("suit", suit);
-      selectParams.set("number", number);
+      card.setParamsMap(selectParams);
     } else {
-      newParams.set("suit", suit);
-      newParams.set("number", number);
+      if (card.back !== undefined) {
+        selectParams.set("back", card.back);
+      }
+      card.setParamsMap(newParams);
     }
     newParams.set("fieldPlayer", player);
 
@@ -687,6 +747,7 @@ class BaseGame {
       newParams,
       1,
     );
+
     await this.awaitCardTransitions(func);
   }
 
@@ -730,4 +791,72 @@ class BaseGame {
   }
 }
 
-export { BaseGame };
+class ItalianBaseGame extends BaseGame {
+  get styleRules() {
+    const rules = [];
+
+    rules.push(
+      ...["bastoni", "coppe", "denari", "spade"].map(
+        (suit, i) => `&[data-suit='${suit}'] {--card-bg-y: ${i}}`,
+      ),
+    );
+    rules.push(
+      ...["1", "2", "3", "4", "5", "6", "7", "fante", "cavallo", "re"].map(
+        (number, i) => `&[data-number='${number}'] {--card-bg-x: ${i}}`,
+      ),
+    );
+
+    rules.push(...super.styleRules);
+
+    return rules;
+  }
+}
+
+class FrenchBaseGame extends BaseGame {
+  get styleRules() {
+    const rules = [];
+
+    rules.push(
+      ...["cuori", "quadri", "fiori", "picche"].map(
+        (suit, i) => `&[data-suit='${suit}'] {--card-bg-y: ${i}}`,
+      ),
+    );
+
+    rules.push(
+      ...["rosso", "nero"].map(
+        (suit, i) => `&[data-suit='${suit}'] {--card-bg-y: ${i}}`,
+      ),
+    );
+
+    rules.push(
+      ...[
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "jack",
+        "donna",
+        "re",
+        "joker",
+      ].map((number, i) => `&[data-number='${number}'] {--card-bg-x: ${i}}`),
+    );
+
+    rules.push(
+      ...["blu", "rosso"].map(
+        (back, i) => `&[data-back='${back}'] {--card-bk-x: ${i}; }`,
+      ),
+    );
+
+    rules.push(...super.styleRules);
+
+    return rules;
+  }
+}
+
+export { ItalianBaseGame, FrenchBaseGame, Card };
