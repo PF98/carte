@@ -6,7 +6,7 @@ from typing import Any
 
 from carte.exc import CmdError
 from carte.games.base import BaseGame, Player, cmd
-from carte.types import Card, CardNumber, GameStatus, Suit
+from carte.types import Card, CardFamily, CardNumber, GameStatus, Suit
 
 
 class ScopaPlayingStatus(StrEnum):
@@ -24,7 +24,13 @@ class ScopaPlayer(Player):
         self.scopa_cards.clear()
 
 
-class Scopa(BaseGame[ScopaPlayer], version=1, number_of_players=2, hand_size=6):
+class Scopa(
+    BaseGame[ScopaPlayer],
+    version=1,
+    card_family=CardFamily.ITALIANE,
+    number_of_players=2,
+    hand_size=6,
+):
     def __init__(self, game_id: str) -> None:
         super().__init__(game_id)
 
@@ -391,7 +397,7 @@ class Scopa(BaseGame[ScopaPlayer], version=1, number_of_players=2, hand_size=6):
         for player in self._players:
             card_numbers.append([])
             scores.append(0)
-            for suit in Suit:
+            for suit in Suit.get_italian():
                 suit_cards = [card for card in player.points if card.suit == suit]
                 card = None
                 card_score = 0
@@ -406,7 +412,7 @@ class Scopa(BaseGame[ScopaPlayer], version=1, number_of_players=2, hand_size=6):
                 card_numbers[-1].append(str(card.number) if card is not None else "0")
 
         primiera_cards = []
-        for i, suit in enumerate(Suit):  # type: ignore[assignment]
+        for i, suit in enumerate(Suit.get_italian()):
             primiera_cards.append(str(suit))
             primiera_cards.extend(cn[i] for cn in card_numbers)
 

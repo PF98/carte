@@ -43,7 +43,7 @@ async def game(request: web.Request) -> Mapping[str, Any]:
     game_type = request.match_info["game_type"]
     if game_type not in BaseGame.GAMES:
         raise web.HTTPNotFound
-    return {"game": game_type}
+    return {"game": game_type, "card_family": BaseGame.GAMES[game_type].card_family}
 
 
 @routes.get("/ws/{game_type}")

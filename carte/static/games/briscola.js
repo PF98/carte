@@ -1,6 +1,6 @@
-import { BaseGame } from "./base.js";
+import { Card, ItalianBaseGame } from "./base.js";
 
-class Briscola extends BaseGame {
+class Briscola extends ItalianBaseGame {
   get playerIdentifiers() {
     return ["opponent", "self"];
   }
@@ -62,18 +62,12 @@ class Briscola extends BaseGame {
     await this.awaitCardTransitions();
   }
 
-  async cmdShowBriscola(card) {
-    const [suit, number] = card.split(":");
+  async cmdShowBriscola(cardStr) {
+    const card = Card.fromString(cardStr);
 
     const deck = this.decks.get("deck");
 
-    const func = deck.moveTo(
-      this.cardFields.get("briscola"),
-      new Map([
-        ["suit", suit],
-        ["number", number],
-      ]),
-    );
+    const func = deck.moveTo(this.cardFields.get("briscola"), card.setParamsMap());
     await this.awaitCardTransitions(func);
   }
 
